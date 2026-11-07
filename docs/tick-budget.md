@@ -178,3 +178,27 @@ What it does not show:
 - `plain` and `nosend` ran in different jobs, so on different runner VMs. The ring record above showed a 37 % drift between runs on one runner. The ratio is robust to that and the absolute nanoseconds are not.
 - Under `nosend`, `datagrams_out` counts nothing real.
 - One runner, 8 clean runs per level, no isolation, loopback only.
+
+## Send path: plain against sendmmsg
+
+A `sendmmsg` variant of `entity_serve` (Linux only) sent the tick's datagrams with one `sendmmsg` call per up to 1024 datagrams instead of one `sendto` each. It was trimmed and is not in the tree. The code is commit `3a0a6f6` on branch `dev/sendmmsg` (pull request 33, closed unmerged). The `tick-sendmmsg` job ran the plain sweep and then the sendmmsg sweep back to back in one job, so both ran on the same runner VM. They were not interleaved run by run. Levels 384, 512, 640 and 768 clients, 8 clean runs and 3 planted 6 ms runs per level. CI run 42413745711, kernel `7.0.0-1017-azure`, server on vCPU 0, loader on vCPU 2. Raw output: `study/sendmmsg-run-1.txt`.
+
+| Clients | Clean p50 per client, plain (ns) | Clean p50 per client, sendmmsg (ns) | Gap (ns) | Clean p99 min to max, plain (µs) | Clean p99 min to max, sendmmsg (µs) | Clean over 4 ms, plain | Clean over 4 ms, sendmmsg |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 384 | 4534 | 4562 | +28 | 2458 to 5924 | 2473 to 5398 | 3 of 8 runs | 4 of 8 runs |
+| 512 | 4580 | 4535 | -45 | 3289 to 6422 | 3234 to 5354 | 4 of 8 runs | 4 of 8 runs |
+| 640 | 4544 | 4621 | +77 | 4051 to 7554 | 4109 to 6739 | 8 of 8 runs | 8 of 8 runs |
+| 768 | 4583 | 4657 | +74 | 4762 to 7672 | 4845 to 10180 | 8 of 8 runs | 8 of 8 runs |
+
+What it shows: `sendmmsg` saved nothing. The gap is between -1 % and +2 % of the per-client cost and changes sign, which is inside run-to-run spread. The wall did not move: both variants have clean runs over 4 ms at 384 and 512 clients and all 8 over at 640 and 768. The planted 6 ms handler was caught in 3 of 3 runs at every level in both sweeps. The prediction written in the pull request was a saving of 5 to 15 %, from syscall entry and exit alone. It was wrong in direction of effect, not in size: there is no saving to measure at 8 runs.
+
+What that implies, together with the nosend control above: skipping the sends removes about 75 % of the per-client cost and batching them removes none. So the cost is not the syscall. It is the per-datagram work inside it: the UDP stack and, on loopback, the receiving socket's work.
+
+What it does not show:
+- On loopback the sender pays the receiver's work. On a real network card a batched send may behave differently.
+- The two sweeps ran back to back, not interleaved, so drift inside the job is not spread across the variants.
+- The plain figures here (about 4550 ns per client) sit 28 % below the `tick-wall` job's (about 6300 ns) from another runner VM. Only comparisons within one job are meaningful.
+- Windows has no `sendmmsg`, and the shipped build is win64.
+- One runner, 8 clean runs per level, no isolation.
+
+Under the rule in the trim section above (a variant that wins no axis is trimmed), `sendmmsg` was trimmed. This section and `study/sendmmsg-run-1.txt` are the record.

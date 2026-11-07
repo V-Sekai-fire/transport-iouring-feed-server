@@ -1,0 +1,217 @@
+## tick-sendmmsg, run 42413745711, branch dev/sendmmsg (plain sweep first, then sendmmsg sweep, same job and runner VM, not interleaved)
+### BACKEND=plain
+7.0.0-1017-azure
+4
+/sys/devices/system/cpu/cpu0/topology/thread_siblings_list:0-1
+/sys/devices/system/cpu/cpu1/topology/thread_siblings_list:0-1
+/sys/devices/system/cpu/cpu2/topology/thread_siblings_list:2-3
+/sys/devices/system/cpu/cpu3/topology/thread_siblings_list:2-3
+open files limit 65536 descriptors; udp receive buffer default 1048576 bytes, max 1048576 bytes; ephemeral ports 32768	60999
+control: a server pinned to 0 reads back as 0
+packet 100 bytes, view 12 entities, user cap 4096 clients, server on 0, loader on 2
+== 384 clients: 38400 bytes in and 460800 bytes out per tick (384 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7752277ns p95=10511152ns p99=11072584ns max=11132553ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2995539ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7766749ns p95=8432827ns p99=8667008ns max=8720959ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2219176ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7783007ns p95=8404645ns p99=8851975ns max=8911014ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1921462ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1722561ns p95=2356962ns p99=2597673ns max=2691694ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1900949ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1769241ns p95=3530331ns p99=5924299ns max=7097035ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4217571ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1741159ns p95=2377743ns p99=3861727ns max=5936286ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3478323ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1761580ns p95=2477011ns p99=4613724ns max=5461795ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3030161ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1739473ns p95=2427649ns p99=3250427ns max=3900162ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2314711ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1747950ns p95=2483462ns p99=4373736ns max=4540986ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2765054ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1741460ns p95=2377617ns p99=2457623ns max=2673534ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1921380ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1737866ns p95=2381791ns p99=2547140ns max=3075506ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1847970ns slow_passes=0 sends_failed=0
+level 384 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 6025590ns; clean p50 median=1741159ns (4534ns per client) p99 min=2457623ns max=5924299ns; clean over the 4 ms budget in 3 of 8 runs, with overruns in 0 of 8 runs, with fewer than 61440 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 384 clients: WALL (over budget in 3, overruns in 0, packet loss in 0 of 8 runs)
+== 512 clients: 51200 bytes in and 614400 bytes out per tick (512 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8332441ns p95=9198105ns p99=9296954ns max=9591198ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2470995ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8316892ns p95=9251543ns p99=10267407ns max=10858894ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2695713ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8343569ns p95=9161245ns p99=11642846ns max=13209774ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2941045ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2345615ns p95=3375571ns p99=5524449ns max=5607214ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2467078ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2416321ns p95=3175508ns p99=3582544ns max=3635193ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2615873ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2358334ns p95=3182930ns p99=3424545ns max=3637607ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3572799ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2336441ns p95=3295084ns p99=5009040ns max=5246899ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2519467ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2317769ns p95=3320042ns p99=4446141ns max=6825553ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2473473ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2361435ns p95=3194122ns p99=3362215ns max=3620595ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2615458ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2311613ns p95=3161998ns p99=3289020ns max=3582294ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2378444ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2345234ns p95=4211834ns p99=6421704ns max=6713705ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4620532ns slow_passes=0 sends_failed=0
+level 512 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 5987207ns; clean p50 median=2345234ns (4580ns per client) p99 min=3289020ns max=6421704ns; clean over the 4 ms budget in 4 of 8 runs, with overruns in 0 of 8 runs, with fewer than 81920 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 512 clients: WALL (over budget in 4, overruns in 0, packet loss in 0 of 8 runs)
+== 640 clients: 64000 bytes in and 768000 bytes out per tick (640 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8951967ns p95=10085550ns p99=10425774ns max=10673919ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2942656ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8906167ns p95=10103366ns p99=10598254ns max=14538838ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4766182ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8918887ns p95=10054963ns p99=11284000ns max=13560641ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4334259ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2959602ns p95=4037433ns p99=4283496ns max=4658552ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2919200ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2903980ns p95=4063573ns p99=7553948ns max=7582111ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4228723ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2904250ns p95=4193379ns p99=7340096ns max=10271918ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5677152ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2915798ns p95=4156482ns p99=6221151ns max=8079840ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4300329ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2908345ns p95=3969178ns p99=7203616ns max=7959879ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5018504ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2912601ns p95=3955799ns p99=4051433ns max=4637969ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2902787ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2893543ns p95=4014316ns p99=4603256ns max=5183803ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4302392ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=3010029ns p95=4252857ns p99=6753105ns max=7323738ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4597708ns slow_passes=0 sends_failed=0
+level 640 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 6010542ns; clean p50 median=2908345ns (4544ns per client) p99 min=4051433ns max=7553948ns; clean over the 4 ms budget in 8 of 8 runs, with overruns in 0 of 8 runs, with fewer than 102400 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 640 clients: WALL (over budget in 8, overruns in 0, packet loss in 0 of 8 runs)
+== 768 clients: 76800 bytes in and 921600 bytes out per tick (768 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9650924ns p95=10987223ns p99=12411354ns max=12794084ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4297214ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9568969ns p95=10869134ns p99=13393378ns max=13727804ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5225526ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9594859ns p95=10901462ns p99=10965439ns max=11602653ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3490705ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3572355ns p95=4778457ns p99=7671857ns max=9253655ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5999712ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3519966ns p95=4717485ns p99=4762203ns max=5347246ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3727680ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3518954ns p95=4781532ns p99=4971499ns max=5428749ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5124449ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3492427ns p95=4729016ns p99=4850609ns max=6138536ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3460349ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3558587ns p95=4877260ns p99=5084963ns max=5485028ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4249090ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3610125ns p95=4951061ns p99=5056210ns max=5540653ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3618758ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3631106ns p95=4960506ns p99=5001237ns max=5627393ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3584697ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3501591ns p95=4771490ns p99=4966805ns max=5534002ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3627562ns slow_passes=0 sends_failed=0
+level 768 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 6074893ns; clean p50 median=3519966ns (4583ns per client) p99 min=4762203ns max=7671857ns; clean over the 4 ms budget in 8 of 8 runs, with overruns in 0 of 8 runs, with fewer than 122880 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 768 clients: WALL (over budget in 8, overruns in 0, packet loss in 0 of 8 runs)
+sweep: ok
+### BACKEND=sendmmsg
+open files limit 65536 descriptors; udp receive buffer default 1048576 bytes, max 1048576 bytes; ephemeral ports 32768	60999
+control: a server pinned to 0 reads back as 0
+packet 100 bytes, view 12 entities, user cap 4096 clients, server on 0, loader on 2
+== 384 clients: 38400 bytes in and 460800 bytes out per tick (384 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7782714ns p95=8462361ns p99=8493428ns max=8817918ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1756173ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7763496ns p95=8462641ns p99=8609754ns max=8770977ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1770003ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=7782524ns p95=8463318ns p99=9759530ns max=10125372ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2479585ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1781692ns p95=2450102ns p99=2474449ns max=2786841ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1758918ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1781432ns p95=4313388ns p99=5397636ns max=5420680ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3283611ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1784256ns p95=2459616ns p99=2899802ns max=2905060ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1978069ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1751907ns p95=2681120ns p99=4809136ns max=4974946ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2463472ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1765758ns p95=3227686ns p99=4468160ns max=4871860ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2958329ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1741491ns p95=2405905ns p99=2473096ns max=2639228ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1768813ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1741982ns p95=3779570ns p99=5102328ns max=5753632ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3500989ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=61440 datagrams_out=66432 overruns=0 p50=1709011ns p95=2340576ns p99=2646829ns max=4442812ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=1787331ns slow_passes=0 sends_failed=0
+level 384 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 6030617ns; clean p50 median=1751907ns (4562ns per client) p99 min=2473096ns max=5397636ns; clean over the 4 ms budget in 4 of 8 runs, with overruns in 0 of 8 runs, with fewer than 61440 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 384 clients: WALL (over budget in 4, overruns in 0, packet loss in 0 of 8 runs)
+== 512 clients: 51200 bytes in and 614400 bytes out per tick (512 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8312758ns p95=9285758ns p99=11156754ns max=12190907ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2925530ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8291135ns p95=9246569ns p99=9290555ns max=9632812ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2447488ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=8289923ns p95=9232618ns p99=11373942ns max=11805013ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3056898ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2285722ns p95=3156949ns p99=4983929ns max=6317564ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3640108ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2332554ns p95=3253054ns p99=3332143ns max=3588801ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2515280ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2371733ns p95=3279454ns p99=5354458ns max=7268661ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4115978ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2313926ns p95=3276159ns p99=4082827ns max=5768034ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3015235ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2389971ns p95=3282357ns p99=3718236ns max=4752800ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2367266ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2348677ns p95=3123527ns p99=3233554ns max=3564093ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2386464ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2321977ns p95=3355979ns p99=4470422ns max=6397323ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3935644ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=81920 datagrams_out=88576 overruns=0 p50=2310780ns p95=3223590ns p99=3352985ns max=3601451ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2405203ns slow_passes=0 sends_failed=0
+level 512 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 5969158ns; clean p50 median=2321977ns (4535ns per client) p99 min=3233554ns max=5354458ns; clean over the 4 ms budget in 4 of 8 runs, with overruns in 0 of 8 runs, with fewer than 81920 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 512 clients: WALL (over budget in 4, overruns in 0, packet loss in 0 of 8 runs)
+== 640 clients: 64000 bytes in and 768000 bytes out per tick (640 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8932855ns p95=10004424ns p99=10089082ns max=10504379ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2977288ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8914478ns p95=10022913ns p99=10098306ns max=10660575ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3014554ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=8932150ns p95=9886010ns p99=9966492ns max=10492376ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2906962ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2909565ns p95=4072540ns p99=4109356ns max=4627389ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2961242ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2948383ns p95=4058601ns p99=4124692ns max=4664326ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3022705ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2957458ns p95=4052682ns p99=5657086ns max=7130452ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4266385ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2968044ns p95=3988285ns p99=4110900ns max=4661453ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2981344ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2929336ns p95=4068066ns p99=4541861ns max=6512698ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=2979842ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2995165ns p95=4185062ns p99=6738701ns max=8107800ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4840153ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=3000163ns p95=4089028ns p99=4114806ns max=4617066ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3086543ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=102400 datagrams_out=110720 overruns=0 p50=2983077ns p95=4109478ns p99=6666611ns max=6991041ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5019744ns slow_passes=0 sends_failed=0
+level 640 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 5974692ns; clean p50 median=2957458ns (4621ns per client) p99 min=4109356ns max=6738701ns; clean over the 4 ms budget in 8 of 8 runs, with overruns in 0 of 8 runs, with fewer than 102400 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 640 clients: WALL (over budget in 8, overruns in 0, packet loss in 0 of 8 runs)
+== 768 clients: 76800 bytes in and 921600 bytes out per tick (768 datagrams of 1200 bytes)
+planted 1: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9606843ns p95=11725704ns p99=15150227ns max=15331861ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5204082ns slow_passes=0 sends_failed=0
+planted 2: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9609416ns p95=10930675ns p99=14351540ns max=15386315ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=5111742ns slow_passes=0 sends_failed=0
+planted 3: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=9599884ns p95=10896733ns p99=13180894ns max=15186264ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=6036530ns slow_passes=0 sends_failed=0
+clean 1: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3563194ns p95=4913444ns p99=5675464ns max=6467602ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4282560ns slow_passes=0 sends_failed=0
+clean 2: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3604976ns p95=4903879ns p99=5019253ns max=5642135ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=4338165ns slow_passes=0 sends_failed=0
+clean 3: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3608712ns p95=8168271ns p99=10179539ns max=10648318ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=7221881ns slow_passes=0 sends_failed=0
+clean 4: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3594360ns p95=4821885ns p99=4911951ns max=5605629ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3666580ns slow_passes=0 sends_failed=0
+clean 5: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3503053ns p95=4901285ns p99=4963489ns max=5607082ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3932791ns slow_passes=0 sends_failed=0
+clean 6: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3542943ns p95=4742264ns p99=4844609ns max=5365997ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3601972ns slow_passes=0 sends_failed=0
+clean 7: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3577075ns p95=4987185ns p99=9278939ns max=9631672ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=6508103ns slow_passes=0 sends_failed=0
+clean 8: cpus=0 packets_in=122880 datagrams_out=132864 overruns=0 p50=3593309ns p95=4866482ns p99=5062429ns max=5618729ns rcvbuf_drops=-1packets
+   loader: max_pass_ns=3667411ns slow_passes=0 sends_failed=0
+level 768 clients: planted caught 3 of 3 runs, planted p50 above clean p50 by 6029768ns; clean p50 median=3577075ns (4657ns per client) p99 min=4844609ns max=10179539ns; clean over the 4 ms budget in 8 of 8 runs, with overruns in 0 of 8 runs, with fewer than 122880 packets in in 0 of 8 runs, loader behind in 0 of 8 runs
+level 768 clients: WALL (over budget in 8, overruns in 0, packet loss in 0 of 8 runs)
+sweep: ok
