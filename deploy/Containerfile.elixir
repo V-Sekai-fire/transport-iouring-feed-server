@@ -1,0 +1,9 @@
+# Bench image for the Elixir feed server next to the Rust leader (datasources/reference).
+# OTP 27 for the built-in :json module and the arm64/x86 JIT; Rust 1.94 for the leader; k6 and Node for load and seed.
+FROM docker.io/library/elixir:1.18-otp-27
+RUN apt-get update -qq && apt-get install -y -qq gcc make curl ca-certificates git sqlite3 jq openssl unzip xz-utils nodejs util-linux procps >/dev/null
+RUN curl -sSfL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.94.0 >/dev/null 2>&1
+ENV PATH=/root/.cargo/bin:$PATH
+RUN set -e; A=$(dpkg --print-architecture); \
+    curl -sSfL https://github.com/grafana/k6/releases/download/v2.3.0/k6-v2.3.0-linux-$A.tar.gz | tar -xz -C /usr/local/bin --strip-components=1 && k6 version
+RUN mix local.hex --force >/dev/null && mix local.rebar --force >/dev/null

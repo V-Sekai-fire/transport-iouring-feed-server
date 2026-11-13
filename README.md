@@ -1,6 +1,8 @@
 # transport-feed-entity-servers
 
-Formerly `transport-iouring-feed-server`; renamed after the io_uring paths were removed. The io_uring measurements stay in `docs/tick-budget.md` and `study/`.
+Formerly `transport-iouring-feed-server`; renamed after the io_uring paths were removed. The io_uring measurements stay in `docs/tick-budget.md` and `study/`. RFD66606-2360 (2026-11-12) allows an io_uring path again beside the portable one; the code has not come back yet.
+
+`transports/elixir-feed/` is an Elixir feed server (sockets, HTTP and JWT in Elixir, SQLite and JSON in one C NIF). `.github/workflows/elixir-feed-bench.yml` compares it with the Rust leader and `feed-server` on one runner; see `transports/elixir-feed/bench/ab.exs`.
 
 Lean 4 port of the Rust `rust-iouring-kensac` submission (MIT, @kensac) to the arjaythedev
 twelve-dollar-server-challenge. The original source is kept in `datasources/reference/`.

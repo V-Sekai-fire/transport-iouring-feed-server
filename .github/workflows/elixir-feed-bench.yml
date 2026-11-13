@@ -1,0 +1,152 @@
+# The Elixir feed server against the Rust leader (datasources/reference) on one runner.
+# Both must pass the challenge's test/test.sh 42/42; then transports/elixir-feed/bench/ab.exs pins each
+# server to CPU 0, drives it with k6 from the other CPUs, and writes the table to the step summary.
+# Same-runner comparison only: never a leaderboard number (the 1-vCPU Synteq box is not reproducible here).
+name: elixir-feed-bench
+on:
+  pull_request:
+    paths:
+      - transports/**
+      - entities/**
+      - repositories/**
+      - datasources/reference/**
+      - datasources/csrc/**
+      - lakefile.lean
+      - lean-toolchain
+      - deploy/scripts/fetch-sqlite.sh
+      - .github/workflows/elixir-feed-bench.yml
+  push:
+    branches: [main]
+    paths:
+      - transports/**
+      - entities/**
+      - repositories/**
+      - datasources/reference/**
+      - datasources/csrc/**
+      - lakefile.lean
+      - lean-toolchain
+      - deploy/scripts/fetch-sqlite.sh
+      - .github/workflows/elixir-feed-bench.yml
+  workflow_dispatch:
+    inputs:
+      reps:
+        description: Repetitions of each rate/sat run (server order alternates)
+        default: "3"
+      rate:
+        description: Second matched-rate load beside 600, user iterations per second (about 2.2 requests each)
+        default: "4000"
+      max_ratio:
+        description: Fail if Elixir/Rust CPU us/req exceeds this (empty = report only)
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: elixir-feed-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CHALLENGE_SHA: 39cd79b2a2ce9e01f99352c1fe8209cb2afc80c1
+  K6_VERSION: v2.3.0
+  FDB_VERSION: "7.3.76"
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Runner conditions
+        run: |
+          uname -r
+          nproc
+          grep -m1 'model name' /proc/cpuinfo
+          if [ "$(nproc)" -lt 4 ]; then echo "expected at least 4 vCPUs, got $(nproc)"; exit 1; fi
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.18"
+      - name: Bench gate self-test (fixtures, no servers)
+        run: elixir transports/elixir-feed/bench/ab.exs --self-test
+      - name: Install Rust 1.94.0, sqlite3 and k6
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal
+          rustup default 1.94.0
+          sudo apt-get update -qq && sudo -S -p '' apt-get install -y -qq sqlite3
+          curl -sSfL "https://github.com/grafana/k6/releases/download/${K6_VERSION}/k6-${K6_VERSION}-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin --strip-components=1
+          k6 version
+      - name: Cache the pinned SQLite amalgamation
+        uses: actions/cache@v4
+        with:
+          path: datasources/reference/vendor
+          key: sqlite-${{ hashFiles('deploy/scripts/fetch-sqlite.sh') }}
+      - name: Fetch the pinned SQLite
+        run: bash deploy/scripts/fetch-sqlite.sh
+      - name: Check out the challenge at a pinned commit
+        uses: actions/checkout@v5
+        with:
+          repository: arjaythedev/twelve-dollar-server-challenge
+          ref: ${{ env.CHALLENGE_SHA }}
+          path: challenge
+      - name: Cache the seed
+        id: seed
+        uses: actions/cache@v4
+        with:
+          path: |
+            challenge/seed/feed.db
+            challenge/seed/tokens.json
+          key: seed-${{ env.CHALLENGE_SHA }}
+      - name: Build the seed
+        if: steps.seed.outputs.cache-hit != 'true'
+        run: bash challenge/seed/make-seed.sh
+      # Not cached: both builds use -march=native, and a build restored onto another runner CPU can SIGILL.
+      - name: Build the Rust leader
+        run: bash datasources/reference/build.sh
+      # The Lean port (transports/Serve.lean) links -lfdb_c in every build, so the FDB client package is
+      # needed even though the bench opens plain SQLite files.
+      - name: Install the FoundationDB client and Lean
+        run: |
+          curl -fsSL -o /tmp/fdb-clients.deb "https://github.com/apple/foundationdb/releases/download/${FDB_VERSION}/foundationdb-clients_${FDB_VERSION}-1_amd64.deb"
+          sudo -S -p '' dpkg -i /tmp/fdb-clients.deb
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build the Lean server
+        run: lake build feed-server
+      # Unmodified challenge entry; its build.sh expects Lean 4.35.0 at /opt/lean-4.35.0.
+      - name: Build lean-derive-hargup (report only)
+        continue-on-error: true
+        run: |
+          sudo ln -sfn "$(lean --print-prefix)" /opt/lean-4.35.0
+          bash challenge/submissions/lean-derive-hargup/build.sh
+      - name: Build the Elixir server (warnings are errors)
+        working-directory: transports/elixir-feed
+        env:
+          MIX_ENV: prod
+        run: mix compile --warnings-as-errors
+      - name: No error trapping in lib/ (try, rescue, catch, throw)
+        working-directory: transports/elixir-feed
+        run: |
+          if grep -rnE '^\s*(try|rescue|catch|throw)\b' lib; then exit 1; fi
+      # Builds the NIF twice (checkpoints forced every 16 frames, and off) and fails if the log is not bounded.
+      - name: The NIF's WAL checkpoint copies frames back
+        run: elixir transports/elixir-feed/bench/wal-bound.exs "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/challenge" 4000
+      - name: Conformance (42/42 each) and the A/B bench
+        working-directory: transports/elixir-feed
+        env:
+          REPS: ${{ inputs.reps || '3' }}
+          SERVERS: rust,elixir,lean,hargup
+          RATES: ${{ inputs.rate && format('600,{0}', inputs.rate) || '600,4000' }}
+          MAX_RATIO: ${{ inputs.max_ratio || '' }}
+          SAT_VUS: "128"
+          DUR: 20s
+          LOAD_VUS: "2000"
+          LOAD_HOLD: 20s
+          RESULTS: ${{ runner.temp }}/ab-results.json
+        run: elixir bench/ab.exs "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/challenge"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elixir-feed-bench
+          path: |
+            ${{ runner.temp }}/ab-results.json
+            /tmp/ab-*.json
+          if-no-files-found: warn
