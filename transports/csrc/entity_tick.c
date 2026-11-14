@@ -14,6 +14,7 @@
 #define PKT XR_PACKET_SIZE
 #include "otel_span.h"
 #if defined(__linux__)
+#define ET_RECV_PATH "io_uring"
 #include <linux/io_uring.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -122,6 +123,7 @@ static void er_close(void) {
   close(er.fd); er.fd = -1;
 }
 #else
+#define ET_RECV_PATH "recvfrom"
 /* No io_uring here: the one receive path is recvfrom, fixed when this file is compiled. */
 static int er_sock = -1;
 static int er_open(int sock) { er_sock = sock; return 0; }
@@ -189,6 +191,8 @@ int et_run_with(const char *host, uint16_t port, uint32_t ticks, uint32_t slow_n
 #endif
     int64_t t0 = now_ns(), first = -1;
     uint32_t pk0 = out->packets_in, dg0 = out->datagrams_out;
+    uint64_t tick_sid = otel_id(ot);
+    otel_trace(ot);
     uint8_t buf[PKT + 8]; struct sockaddr_storage from; socklen_t fl;
     for (;;) {
       fl = sizeof from;
@@ -199,6 +203,7 @@ int et_run_with(const char *host, uint16_t port, uint32_t ticks, uint32_t slow_n
       int i = find(&from, fl);
       if (i >= 0) { memcpy(ents[i], buf, PKT); out->packets_in++; }
     }
+    int64_t tr = now_ns();
     if (slow_ns) { int64_t end = now_ns() + slow_ns; while (now_ns() < end) { } }
     int n = 0;
     for (int i = 0; i < ET_MAX_USERS; i++) {
@@ -209,30 +214,41 @@ int et_run_with(const char *host, uint16_t port, uint32_t ticks, uint32_t slow_n
       outs[n].buf = dgs[n]; outs[n].len = (uint32_t)k * PKT; outs[n].to = &sess[i].a; outs[n].tolen = sess[i].al;
       n++;
     }
+    int64_t tb = now_ns();
     if (io && io->send_all) out->datagrams_out += (uint32_t)io->send_all(fd, outs, n);
     else
       for (int i = 0; i < n; i++)
         if (sendto(fd, outs[i].buf, outs[i].len, 0, (const struct sockaddr *)outs[i].to, outs[i].tolen) >= 0) out->datagrams_out++;
     int64_t t1 = now_ns();
     {
-      static const char *const k[4] = { "clients", "packets_in", "datagrams_out", "tick" };
-      int64_t v[4]; v[0] = n; v[1] = (int64_t)out->packets_in - pk0; v[2] = (int64_t)out->datagrams_out - dg0; v[3] = t;
-      otel_span(ot, "entity.tick", run_sid, t0, t1, 4, k, v);
-      if (ot->n >= OTEL_CAP / 2 && next - t1 > 3000000) otel_flush(ot);
+      otel_rec_t *r;
+      r = otel_begin(ot, otel_id(ot), "entity.recv", tick_sid, t0, tr); otel_num(r, "packets_in", (double)(out->packets_in - pk0));
+      r = otel_begin(ot, otel_id(ot), "entity.build", tick_sid, tr, tb); otel_num(r, "clients", n);
+      r = otel_begin(ot, otel_id(ot), "entity.send", tick_sid, tb, t1); otel_num(r, "datagrams_out", (double)(out->datagrams_out - dg0));
+      r = otel_begin(ot, tick_sid, "entity.tick", 0, t0, t1); otel_kind(r, 2);
+      otel_num(r, "clients", n); otel_num(r, "packets_in", (double)(out->packets_in - pk0));
+      otel_num(r, "datagrams_out", (double)(out->datagrams_out - dg0)); otel_num(r, "tick_us", (double)(t1 - t0) / 1000.0);
+      otel_num(r, "late_us", (double)(t0 - next) / 1000.0);
+      otel_str(r, "recv", ET_RECV_PATH);
+      if (t1 > next + ET_TICK_NS) otel_error(r, "TickOverrun", "the tick ran past its 15.6 ms slot");
+      if (ot->n >= OTEL_FLUSH_AT && next - t1 > 3000000) otel_flush(ot);
     }
     lat[t] = t1 - (first >= 0 ? first : t0);
     if (t1 > next + ET_TICK_NS) { out->overruns++; next = t1 + ET_TICK_NS; } else next += ET_TICK_NS;
   }
   out->ticks = ticks;
-  {
-    static const char *const k[3] = { "ticks", "packets_in", "datagrams_out" };
-    int64_t v[3]; v[0] = ticks; v[1] = (int64_t)out->packets_in; v[2] = (int64_t)out->datagrams_out;
-    otel_span_as(ot, run_sid, "entity.run", 0, run_t0, now_ns(), 3, k, v);
-    otel_close(ot);
-  }
   { static int64_t s[1 << 16]; memcpy(s, lat, (size_t)ticks * sizeof(int64_t));
     qsort(s, ticks, sizeof(int64_t), cmp);
     out->p50_ns = s[ticks / 2]; out->p95_ns = s[(ticks * 95u) / 100]; out->p99_ns = s[(ticks * 99u) / 100]; out->max_ns = s[ticks - 1]; }
+  {
+    otel_rec_t *r; otel_trace(ot);
+    r = otel_begin(ot, run_sid, "entity.run", 0, run_t0, now_ns()); otel_kind(r, 2);
+    otel_num(r, "ticks", ticks); otel_num(r, "packets_in", out->packets_in); otel_num(r, "datagrams_out", out->datagrams_out);
+    otel_num(r, "overruns", out->overruns); otel_num(r, "p50_us", (double)out->p50_ns / 1000.0);
+    otel_num(r, "p95_us", (double)out->p95_ns / 1000.0); otel_num(r, "p99_us", (double)out->p99_ns / 1000.0); otel_num(r, "max_us", (double)out->max_ns / 1000.0);
+    otel_str(r, "recv", ET_RECV_PATH);
+    if (out->overruns) otel_error(r, "TickOverrun", "ticks ran past their slot during the run");
+  }
   out->rcvbuf_drops = -1;
 #ifdef SO_MEMINFO
   { uint32_t mi[9]; socklen_t ml = sizeof mi; /* SK_MEMINFO_DROPS is index 8 */
@@ -241,6 +257,7 @@ int et_run_with(const char *host, uint16_t port, uint32_t ticks, uint32_t slow_n
 #ifdef __linux__
   out->rcvbuf_drops = er_overflow();
 #endif
+  otel_close(ot);
   er_close();
   if (io && io->close) io->close();
   close(fd);

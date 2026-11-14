@@ -7,8 +7,8 @@
 #include <cstring>
 #include <functional>
 #include <string>
-#include <vector>
 #include <unistd.h>
+#include <vector>
 
 extern "C" {
 #include "../csrc/otel_span.h"
@@ -16,12 +16,18 @@ extern "C" {
 
 namespace {
 
+struct Att {
+	int kind = 2; // 1 int, 2 double, 3 string
+	double d = 0;
+	int64_t i = 0;
+	int s = 0;
+};
+
 struct Item {
-	int name = 0;
-	bool child = false;
+	int name = 0, kind = 1;
+	bool child = false, trace = false, err = false;
 	int64_t t0 = 0, t1 = 0;
-	uint32_t nattr = 0;
-	int64_t val[OTEL_ATTRS] = {};
+	std::vector<Att> att;
 };
 
 struct Case {
@@ -29,7 +35,8 @@ struct Case {
 };
 
 const char *const NAMES[4] = { "entity.tick", "entity.run", "relay.pass", "a.b" };
-const char *const KEYS[OTEL_ATTRS] = { "clients", "packets_in", "datagrams_out", "tick", "k", "n" };
+const char *const KEYS[OTEL_ATTRS] = { "clients", "packets_in", "datagrams_out", "tick_us", "recv", "k", "n", "late_us" };
+const char *const STRS[3] = { "io_uring", "recvfrom", "a string with spaces, \"quotes\" and a \\ and \xc3\xa9" };
 
 Case gen_case(witness::RNG &rng, const witness::Level &lvl) {
 	Case c;
@@ -37,12 +44,20 @@ Case gen_case(witness::RNG &rng, const witness::Level &lvl) {
 	for (uint32_t i = 0; i < n; ++i) {
 		Item it;
 		it.name = rng.int_range(0, 3);
+		it.kind = rng.int_range(1, 5);
 		it.child = i > 0 && rng.int_range(0, 1) == 1;
+		it.trace = !it.child && rng.int_range(0, 1) == 1;
+		it.err = rng.int_range(0, 4) == 0;
 		it.t0 = rng.int64_range(0, 4000000000000LL);
 		it.t1 = it.t0 + rng.int64_range(0, 9000000);
-		it.nattr = rng.uint_range(0, OTEL_ATTRS + 2);
-		for (int k = 0; k < OTEL_ATTRS; ++k) {
-			it.val[k] = rng.int64_range(-1000000000000LL, 1000000000000LL);
+		uint32_t na = rng.uint_range(0, OTEL_ATTRS + 2);
+		for (uint32_t k = 0; k < na; ++k) {
+			Att a;
+			a.kind = rng.int_range(1, 3);
+			a.d = rng.float_range(-1e9, 1e9);
+			a.i = rng.int64_range(-1000000000000LL, 1000000000000LL);
+			a.s = rng.int_range(0, 2);
+			it.att.push_back(a);
 		}
 		c.items.push_back(it);
 	}
@@ -54,22 +69,42 @@ otel_t *store() {
 	return o;
 }
 
-// Runs the emitter on a case and returns the bytes it wrote in one flush.
-std::string emit(const Case &c, std::vector<uint64_t> *ids, uint32_t *dropped, uint32_t *left) {
+// Runs the emitter on a case and returns the bytes it wrote in one flush. traces gets the trace id each span was recorded under.
+std::string emit(const Case &c, std::vector<uint64_t> *ids, std::vector<std::string> *traces, uint32_t *dropped, uint32_t *left) {
 	otel_t *o = store();
 	char path[] = "/tmp/otel_witness_XXXXXX";
 	int fd = mkstemp(path);
 	close(fd);
 	otel_open(o, path, 7);
+	std::vector<uint64_t> local;
+	std::vector<uint64_t> &seen = ids ? *ids : local;
 	for (const Item &it : c.items) {
-		uint64_t parent = (it.child && ids && !ids->empty()) ? ids->back() : 0;
-		int64_t vals[OTEL_ATTRS];
-		for (int k = 0; k < OTEL_ATTRS; ++k) {
-			vals[k] = it.val[k];
+		if (it.trace) {
+			otel_trace(o);
 		}
-		uint64_t sid = otel_span(o, NAMES[it.name], parent, it.t0, it.t1, it.nattr, KEYS, vals);
-		if (ids) {
-			ids->push_back(sid);
+		uint64_t parent = (it.child && !seen.empty()) ? seen.back() : 0;
+		uint64_t sid = otel_id(o);
+		otel_rec_t *r = otel_begin(o, sid, NAMES[it.name], parent, it.t0, it.t1);
+		otel_kind(r, static_cast<uint8_t>(it.kind));
+		for (size_t k = 0; k < it.att.size(); ++k) {
+			const Att &a = it.att[k];
+			if (a.kind == 1) {
+				otel_int(r, KEYS[k % OTEL_ATTRS], a.i);
+			} else if (a.kind == 2) {
+				otel_num(r, KEYS[k % OTEL_ATTRS], a.d);
+			} else {
+				otel_str(r, KEYS[k % OTEL_ATTRS], STRS[a.s]);
+			}
+		}
+		if (it.err) {
+			otel_error(r, "TickOverrun", "the tick ran past its slot");
+		}
+		seen.push_back(sid);
+		if (traces) {
+			uint8_t id[16];
+			otel_pb_be(id, o->tid_hi);
+			otel_pb_be(id + 8, o->tid_lo);
+			traces->push_back(std::string(reinterpret_cast<char *>(id), 16));
 		}
 	}
 	otel_flush(o);
@@ -93,10 +128,17 @@ std::string emit(const Case &c, std::vector<uint64_t> *ids, uint32_t *dropped, u
 	return text;
 }
 
+struct PbAtt {
+	std::string key, s;
+	int kind = 0;
+	uint64_t bits = 0;
+};
+
 struct PbSpan {
-	std::string trace, sid, parent, name;
-	uint64_t kind = 0, t0 = 0, t1 = 0;
-	std::vector<std::pair<std::string, uint64_t>> attrs;
+	std::string trace, sid, parent, name, status_msg, ev_name, ev_type, ev_msg;
+	bool has_state = false, has_status = false, has_event = false, has_dropped_attrs = false, has_dropped_events = false, has_dropped_links = false, has_flags = false;
+	uint64_t kind = 0, t0 = 0, t1 = 0, status_code = 0, flags = 0, ev_time = 0, ev_dropped = 99;
+	std::vector<PbAtt> attrs;
 };
 
 struct Rd {
@@ -121,43 +163,93 @@ struct Rd {
 		p += n;
 		return true;
 	}
-	bool fixed(uint64_t *v) {
-		if (e - p < 8) {
+	bool fixed(uint64_t *v, int bytes_n) {
+		if (e - p < bytes_n) {
 			return false;
 		}
 		*v = 0;
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < bytes_n; i++) {
 			*v |= static_cast<uint64_t>(p[i]) << (8 * i);
 		}
-		p += 8;
+		p += bytes_n;
 		return true;
 	}
 };
 
-bool dec_attr(const std::string &m, std::pair<std::string, uint64_t> *out) {
-	Rd r{ reinterpret_cast<const uint8_t *>(m.data()), reinterpret_cast<const uint8_t *>(m.data()) + m.size() };
+Rd rd(const std::string &m) { return Rd{ reinterpret_cast<const uint8_t *>(m.data()), reinterpret_cast<const uint8_t *>(m.data()) + m.size() }; }
+
+bool dec_attr(const std::string &m, PbAtt *out) {
+	Rd r = rd(m);
 	while (r.p < r.e) {
 		uint64_t tag;
 		std::string s;
 		if (!r.varint(&tag) || (tag & 7) != 2 || !r.bytes(&s)) {
 			return false;
 		}
-		if (tag >> 3 == 1) {
-			out->first = s;
-		} else {
-			Rd a{ reinterpret_cast<const uint8_t *>(s.data()), reinterpret_cast<const uint8_t *>(s.data()) + s.size() };
-			uint64_t t, v;
-			if (!a.varint(&t) || t != 0x18 || !a.varint(&v) || a.p != a.e) {
+		if (tag == 0x0A) {
+			out->key = s;
+		} else if (tag == 0x12) {
+			Rd a = rd(s);
+			uint64_t t;
+			if (!a.varint(&t)) {
 				return false;
 			}
-			out->second = v;
+			if (t == 0x0A) {
+				out->kind = 3;
+				if (!a.bytes(&out->s)) {
+					return false;
+				}
+			} else if (t == 0x18) {
+				out->kind = 1;
+				if (!a.varint(&out->bits)) {
+					return false;
+				}
+			} else if (t == 0x21) {
+				out->kind = 2;
+				if (!a.fixed(&out->bits, 8)) {
+					return false;
+				}
+			} else {
+				return false;
+			}
+			if (a.p != a.e) {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool dec_event(const std::string &m, PbSpan *o) {
+	Rd r = rd(m);
+	o->has_event = true;
+	while (r.p < r.e) {
+		uint64_t tag;
+		std::string s;
+		if (!r.varint(&tag)) {
+			return false;
+		}
+		if (tag == 0x09) {
+			if (!r.fixed(&o->ev_time, 8)) return false;
+		} else if (tag == 0x12) {
+			if (!r.bytes(&o->ev_name)) return false;
+		} else if (tag == 0x1A) {
+			PbAtt a;
+			if (!r.bytes(&s) || !dec_attr(s, &a)) return false;
+			(a.key == "exception.type" ? o->ev_type : o->ev_msg) = a.s;
+		} else if (tag == 0x20) {
+			if (!r.varint(&o->ev_dropped)) return false;
+		} else {
+			return false;
 		}
 	}
 	return true;
 }
 
 bool dec_span(const std::string &m, PbSpan *o) {
-	Rd r{ reinterpret_cast<const uint8_t *>(m.data()), reinterpret_cast<const uint8_t *>(m.data()) + m.size() };
+	Rd r = rd(m);
 	while (r.p < r.e) {
 		uint64_t tag, v;
 		std::string s;
@@ -167,24 +259,43 @@ bool dec_span(const std::string &m, PbSpan *o) {
 		switch (tag) {
 			case 0x0A: if (!r.bytes(&o->trace)) return false; break;
 			case 0x12: if (!r.bytes(&o->sid)) return false; break;
+			case 0x1A: if (!r.bytes(&s) || !s.empty()) return false; o->has_state = true; break;
 			case 0x22: if (!r.bytes(&o->parent)) return false; break;
 			case 0x2A: if (!r.bytes(&o->name)) return false; break;
 			case 0x30: if (!r.varint(&o->kind)) return false; break;
-			case 0x39: if (!r.fixed(&o->t0)) return false; break;
-			case 0x41: if (!r.fixed(&o->t1)) return false; break;
+			case 0x39: if (!r.fixed(&o->t0, 8)) return false; break;
+			case 0x41: if (!r.fixed(&o->t1, 8)) return false; break;
 			case 0x4A: {
-				std::pair<std::string, uint64_t> kv;
-				if (!r.bytes(&s) || !dec_attr(s, &kv)) return false;
-				o->attrs.push_back(kv);
+				PbAtt a;
+				if (!r.bytes(&s) || !dec_attr(s, &a)) return false;
+				o->attrs.push_back(a);
 				break;
 			}
-			default: (void)v; return false;
+			case 0x50: if (!r.varint(&v) || v != 0) return false; o->has_dropped_attrs = true; break;
+			case 0x5A: if (!r.bytes(&s) || !dec_event(s, o)) return false; break;
+			case 0x60: if (!r.varint(&v) || v != 0) return false; o->has_dropped_events = true; break;
+			case 0x70: if (!r.varint(&v) || v != 0) return false; o->has_dropped_links = true; break;
+			case 0x7A: {
+				if (!r.bytes(&s)) return false;
+				Rd st = rd(s);
+				while (st.p < st.e) {
+					uint64_t t;
+					if (!st.varint(&t)) return false;
+					if (t == 0x12) { if (!st.bytes(&o->status_msg)) return false; }
+					else if (t == 0x18) { if (!st.varint(&o->status_code)) return false; }
+					else return false;
+				}
+				o->has_status = true;
+				break;
+			}
+			case 133: if (!r.fixed(&o->flags, 4)) return false; o->has_flags = true; break;
+			default: return false;
 		}
 	}
 	return true;
 }
 
-// Reads every record; false if any byte is left over or malformed.
+// Reads every record; false if any byte is left over or malformed, or the scope lacks its version, count or schema URL.
 bool dec_all(const std::string &t, std::vector<PbSpan> *out) {
 	size_t at = 0;
 	while (at < t.size()) {
@@ -198,7 +309,7 @@ bool dec_all(const std::string &t, std::vector<PbSpan> *out) {
 		}
 		Rd r{ reinterpret_cast<const uint8_t *>(t.data()) + at, reinterpret_cast<const uint8_t *>(t.data()) + at + len };
 		at += len;
-		bool scoped = false;
+		bool scoped = false, schema = false;
 		while (r.p < r.e) {
 			uint64_t tag;
 			std::string s;
@@ -206,18 +317,20 @@ bool dec_all(const std::string &t, std::vector<PbSpan> *out) {
 				return false;
 			}
 			if (tag == 0x0A) {
-				scoped = s == "\x0A\x0D" "entity-server";
+				scoped = s == std::string("\x0A\x0D" "entity-server" "\x12\x01" "1" "\x20\x00", 20);
 			} else if (tag == 0x12) {
 				PbSpan sp;
 				if (!dec_span(s, &sp)) {
 					return false;
 				}
 				out->push_back(sp);
+			} else if (tag == 0x1A) {
+				schema = s == OTEL_SCHEMA;
 			} else {
 				return false;
 			}
 		}
-		if (!scoped) {
+		if (!scoped || !schema) {
 			return false;
 		}
 	}
@@ -226,18 +339,85 @@ bool dec_all(const std::string &t, std::vector<PbSpan> *out) {
 
 } // namespace
 
-TEST_CASE("[otel] span ids are never zero and never repeat within a trace") {
+TEST_CASE("[otel] the records decode to the spans that were recorded, every field and every optional field") {
 	witness::Generator<Case> gen = &gen_case;
 	std::function<bool(const Case &)> pred = [](const Case &c) {
 		std::vector<uint64_t> ids;
-		std::string t = emit(c, &ids, nullptr, nullptr);
+		std::vector<std::string> traces;
+		std::string t = emit(c, &ids, &traces, nullptr, nullptr);
+		std::vector<PbSpan> got;
+		if (!dec_all(t, &got)) {
+			return false;
+		}
+		size_t want = c.items.size() < OTEL_CAP ? c.items.size() : OTEL_CAP;
+		if (got.size() != want) {
+			return false;
+		}
+		int64_t off = store()->wall_off;
+		for (size_t i = 0; i < want; ++i) {
+			const Item &it = c.items[i];
+			const PbSpan &g = got[i];
+			uint8_t id[8];
+			otel_pb_be(id, ids[i]);
+			bool root = !(it.child && i > 0);
+			uint8_t pid[8] = {};
+			if (!root) {
+				otel_pb_be(pid, ids[i - 1]);
+			}
+			size_t na = it.att.size() > OTEL_ATTRS ? OTEL_ATTRS : it.att.size();
+			if (g.trace != traces[i] || g.sid != std::string(reinterpret_cast<char *>(id), 8) || g.name != NAMES[it.name] || g.kind != static_cast<uint64_t>(it.kind) ||
+					g.t0 != static_cast<uint64_t>(it.t0 + off) || g.t1 != static_cast<uint64_t>(it.t1 + off) || g.attrs.size() != na ||
+					(root ? !g.parent.empty() : g.parent != std::string(reinterpret_cast<char *>(pid), 8))) {
+				return false;
+			}
+			// the optional parts are always there
+			if (!g.has_state || !g.has_status || !g.has_flags || g.flags != 0x101 || !g.has_dropped_attrs || !g.has_dropped_events || !g.has_dropped_links) {
+				return false;
+			}
+			if (it.err ? (g.status_code != 2 || g.status_msg != "the tick ran past its slot" || !g.has_event || g.ev_name != "exception" || g.ev_type != "TickOverrun" ||
+								 g.ev_msg != "the tick ran past its slot" || g.ev_time != static_cast<uint64_t>(it.t1 + off) || g.ev_dropped != 0)
+						: (g.status_code != 1 || !g.status_msg.empty() || g.has_event)) {
+				return false;
+			}
+			for (size_t k = 0; k < na; ++k) {
+				const Att &a = it.att[k];
+				const PbAtt &p = g.attrs[k];
+				if (p.key != KEYS[k % OTEL_ATTRS] || p.kind != a.kind) {
+					return false;
+				}
+				if (a.kind == 1 && p.bits != static_cast<uint64_t>(a.i)) {
+					return false;
+				}
+				if (a.kind == 2) {
+					double d;
+					memcpy(&d, &p.bits, 8);
+					if (d != a.d) {
+						return false;
+					}
+				}
+				if (a.kind == 3 && p.s != std::string(STRS[a.s]).substr(0, OTEL_STR_MAX)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	};
+	witness::Trial t = witness::resolve<Case>("roundtrip", gen, pred);
+	INFO(t.message);
+	CHECK(t.outcome != witness::Outcome::FOUND);
+}
+
+TEST_CASE("[otel] span ids are never zero and never repeat, and every trace id is non-zero") {
+	witness::Generator<Case> gen = &gen_case;
+	std::function<bool(const Case &)> pred = [](const Case &c) {
+		std::string t = emit(c, nullptr, nullptr, nullptr, nullptr);
 		std::vector<PbSpan> got;
 		if (!dec_all(t, &got)) {
 			return false;
 		}
 		std::vector<std::string> seen;
 		for (const PbSpan &g : got) {
-			if (g.sid == std::string(8, '\0')) {
+			if (g.sid == std::string(8, '\0') || g.trace == std::string(16, '\0')) {
 				return false;
 			}
 			for (const std::string &x : seen) {
@@ -262,7 +442,7 @@ TEST_CASE("[otel] a full ring drops and counts, and a flush empties it") {
 	};
 	std::function<bool(const Case &)> pred = [](const Case &c) {
 		uint32_t dropped = 99, left = 99;
-		std::string t = emit(c, nullptr, &dropped, &left);
+		std::string t = emit(c, nullptr, nullptr, &dropped, &left);
 		std::vector<PbSpan> got;
 		size_t n = c.items.size();
 		return dec_all(t, &got) && dropped == (n > OTEL_CAP ? n - OTEL_CAP : 0) && left == 0 && got.size() == (n < OTEL_CAP ? n : OTEL_CAP);
@@ -276,7 +456,7 @@ TEST_CASE("[otel] falsifiability: a flush that leaves spans queued is planted fa
 	witness::Generator<Case> gen = &gen_case;
 	std::function<bool(const Case &)> pred = [](const Case &c) {
 		uint32_t left = 0;
-		emit(c, nullptr, nullptr, &left);
+		emit(c, nullptr, nullptr, nullptr, &left);
 		return left != 0 || c.items.empty();
 	};
 	witness::Trial t = witness::resolve<Case>("flush leaves spans", gen, pred);
@@ -284,53 +464,23 @@ TEST_CASE("[otel] falsifiability: a flush that leaves spans queued is planted fa
 	CHECK(t.outcome == witness::Outcome::FOUND);
 }
 
-TEST_CASE("[otel] the protobuf records decode to the spans that were recorded") {
+TEST_CASE("[otel] falsifiability: every measurement being an integer is planted false and is caught") {
 	witness::Generator<Case> gen = &gen_case;
 	std::function<bool(const Case &)> pred = [](const Case &c) {
-		std::vector<uint64_t> ids;
-		std::string t = emit(c, &ids, nullptr, nullptr);
 		std::vector<PbSpan> got;
-		if (!dec_all(t, &got)) {
+		if (!dec_all(emit(c, nullptr, nullptr, nullptr, nullptr), &got)) {
 			return false;
 		}
-		size_t want = c.items.size() < OTEL_CAP ? c.items.size() : OTEL_CAP;
-		if (got.size() != want) {
-			return false;
-		}
-		int64_t off = store()->wall_off;
-		for (size_t i = 0; i < want; ++i) {
-			const Item &it = c.items[i];
-			const PbSpan &g = got[i];
-			uint8_t id[8];
-			otel_pb_be(id, ids[i]);
-			bool root = !(it.child && i > 0);
-			uint8_t pid[8] = {};
-			if (!root) {
-				otel_pb_be(pid, ids[i - 1]);
-			}
-			uint32_t na = it.nattr > OTEL_ATTRS ? OTEL_ATTRS : it.nattr;
-			if (g.trace.size() != 16 || g.sid != std::string(reinterpret_cast<char *>(id), 8) || g.name != NAMES[it.name] || g.kind != 1 ||
-					g.t0 != static_cast<uint64_t>(it.t0 + off) || g.t1 != static_cast<uint64_t>(it.t1 + off) || g.attrs.size() != na ||
-					(root ? !g.parent.empty() : g.parent != std::string(reinterpret_cast<char *>(pid), 8)) || g.trace != got[0].trace) {
-				return false;
-			}
-			for (uint32_t k = 0; k < na; ++k) {
-				if (g.attrs[k].first != KEYS[k] || g.attrs[k].second != static_cast<uint64_t>(it.val[k])) {
+		for (const PbSpan &g : got) {
+			for (const PbAtt &a : g.attrs) {
+				if (a.kind != 1) {
 					return false;
 				}
 			}
 		}
 		return true;
 	};
-	witness::Trial t = witness::resolve<Case>("protobuf roundtrip", gen, pred);
-	INFO(t.message);
-	CHECK(t.outcome != witness::Outcome::FOUND);
-}
-
-TEST_CASE("[otel] falsifiability: protobuf output being empty is planted false and is caught") {
-	witness::Generator<Case> gen = &gen_case;
-	std::function<bool(const Case &)> pred = [](const Case &c) { return emit(c, nullptr, nullptr, nullptr).empty(); };
-	witness::Trial t = witness::resolve<Case>("pb is empty", gen, pred);
+	witness::Trial t = witness::resolve<Case>("all attributes are integers", gen, pred);
 	INFO(t.message);
 	CHECK(t.outcome == witness::Outcome::FOUND);
 }
